@@ -1,11 +1,15 @@
-#
-# PSDPartition.ps1
-#
+# // ***************************************************************************
+# // 
+# // PowerShell Deployment for MDT
+# //
+# // File:      PSDPartition.ps1
+# // 
+# // Purpose:   Partition the disk
+# // 
+# // ***************************************************************************
 
-# Load core module
-$deployRoot = Split-Path -Path "$PSScriptRoot"
-Write-Verbose "Using deploy root $deployRoot, based on $PSScriptRoot"
-Import-Module "$deployRoot\Scripts\PSDUtility.psm1" -Force
+# Load core modules
+Import-Module PSDUtility
 $verbosePreference = "Continue"
 
 # Keep the logging out of the way
@@ -98,11 +102,22 @@ else
     Format-Volume -DriveLetter $tsenv:RecoveryVolume -FileSystem NTFS
 }
 
-# Copy files to new data path
-$newLocalDatPath = Get-PSDLocalDataPath
-if ($currentLocalDataPath -ine $newLocalDatPath)
+# Make sure there is a PSDrive for he OS volume
+if ((Test-Path "$($tsenv:OSVolume):\") -eq $false)
 {
-    Copy-Item $currentLocalDataPath $newLocalDatPath -Recurse -Force
+    New-PSDrive -Name $tsenv:OSVolume -PSProvider FileSystem -Root "$($tsenv:OSVolume):\"
+}
+
+# If the old local data path survived the partitioning, copy it to the new location
+if (Test-Path $currentLocalDataPath)
+{
+    # Copy files to new data path
+    $newLocalDataPath = Get-PSDLocalDataPath -Move
+    if ($currentLocalDataPath -ine $newLocalDataPath)
+    {
+        Write-Verbose "Copying $currentLocalDataPath to $newLocalDataPath"
+        Copy-PSDFolder $currentLocalDataPath $newLocalDataPath
+    }
 }
 
 # Save all the current variables for later use
